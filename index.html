@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>OCR Pedidos Prime</title>
+
+<link rel="manifest" href="./manifest.json">
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+
+body{
+    font-family:Arial,sans-serif;
+    background:#f4f4f4;
+    padding:20px;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    margin-top:10px;
+    font-size:18px;
+}
+
+textarea{
+    width:100%;
+    height:300px;
+    margin-top:15px;
+}
+
+#status{
+    margin-top:15px;
+    font-weight:bold;
+}
+
+img{
+    width:100%;
+    margin-top:15px;
+    border-radius:8px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>OCR Pedidos Prime</h2>
+
+<input
+    type="file"
+    id="imagem"
+    accept="image/*"
+    capture="environment">
+
+<img id="preview">
+
+<div id="status"></div>
+
+<textarea id="resultado"></textarea>
+
+<script>
+
+if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./sw.js");
+}
+
+const input = document.getElementById("imagem");
+const preview = document.getElementById("preview");
+const resultado = document.getElementById("resultado");
+const status = document.getElementById("status");
+
+input.addEventListener("change", async e => {
+
+    const arquivo = e.target.files[0];
+
+    if(!arquivo) return;
+
+    preview.src = URL.createObjectURL(arquivo);
+
+    status.innerHTML = "Lendo OCR...";
+
+    const resposta = await Tesseract.recognize(
+        arquivo,
+        "por"
+    );
+
+    resultado.value = resposta.data.text;
+
+    status.innerHTML = "OCR concluído";
+
+});
+
+</script>
+
+</body>
+</html>
