@@ -1,23 +1,24 @@
-const CACHE_NAME = "ocr-prime-v1";
-
-const FILES = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES))
-  );
-});
-
-self.addEventListener("fetch", event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
-});
+{
+  "name": "EXTRATOR",
+  "short_name": "EXTRATOR",
+  "description": "Extrator de pedidos Prime",
+  "start_url": "/EXTRATOR/",
+  "scope": "/EXTRATOR/",
+  "display": "standalone",
+  "background_color": "#0f1e2e",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
