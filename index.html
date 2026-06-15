@@ -4,36 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>OCR Pedidos Prime</title>
+<title>EXTRATOR</title>
 
 <link rel="manifest" href="./manifest.json">
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-
 body{
     font-family:Arial,sans-serif;
     background:#f4f4f4;
-    padding:20px;
+    padding:16px;
+}
+
+h2{
+    margin-top:0;
+}
+
+input, button, textarea{
+    width:100%;
+    box-sizing:border-box;
 }
 
 button{
-    width:100%;
-    padding:15px;
+    padding:14px;
     margin-top:10px;
     font-size:18px;
+    font-weight:bold;
 }
 
 textarea{
-    width:100%;
-    height:300px;
-    margin-top:15px;
+    height:260px;
+    margin-top:10px;
+    font-size:16px;
+    padding:8px;
 }
 
 #status{
     margin-top:15px;
     font-weight:bold;
+    font-size:18px;
 }
 
 img{
@@ -42,12 +52,39 @@ img{
     border-radius:8px;
 }
 
+.bloco{
+    background:white;
+    padding:12px;
+    margin-top:15px;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+
+.numero{
+    display:inline-block;
+    padding:10px 14px;
+    margin:5px;
+    background:#1a3a5c;
+    color:white;
+    border-radius:6px;
+    font-size:18px;
+    font-weight:bold;
+}
+
+.linha{
+    font-family:monospace;
+    background:#eee;
+    padding:8px;
+    margin:5px 0;
+    border-radius:5px;
+    white-space:pre-wrap;
+}
 </style>
 </head>
 
 <body>
 
-<h2>OCR Pedidos Prime</h2>
+<h2>EXTRATOR</h2>
 
 <input
     type="file"
@@ -57,12 +94,24 @@ img{
 
 <img id="preview">
 
-<div id="status"></div>
+<div id="status">Aguardando imagem...</div>
 
-<textarea id="resultado"></textarea>
+<div class="bloco">
+    <h3>Números encontrados</h3>
+    <div id="numeros"></div>
+</div>
+
+<div class="bloco">
+    <h3>Linhas prováveis de pedido</h3>
+    <div id="linhasPedido"></div>
+</div>
+
+<div class="bloco">
+    <h3>Texto OCR completo</h3>
+    <textarea id="resultado"></textarea>
+</div>
 
 <script>
-
 if("serviceWorker" in navigator){
     navigator.serviceWorker.register("./sw.js");
 }
@@ -71,28 +120,96 @@ const input = document.getElementById("imagem");
 const preview = document.getElementById("preview");
 const resultado = document.getElementById("resultado");
 const status = document.getElementById("status");
+const numerosDiv = document.getElementById("numeros");
+const linhasPedidoDiv = document.getElementById("linhasPedido");
 
 input.addEventListener("change", async e => {
-
     const arquivo = e.target.files[0];
 
     if(!arquivo) return;
 
     preview.src = URL.createObjectURL(arquivo);
 
-    status.innerHTML = "Lendo OCR...";
+    status.innerHTML = "Lendo OCR... aguarde.";
 
-    const resposta = await Tesseract.recognize(
-    arquivo,
-    "por+eng"
-);
+    resultado.value = "";
+    numerosDiv.innerHTML = "";
+    linhasPedidoDiv.innerHTML = "";
 
-    resultado.value = resposta.data.text;
+    try{
+        const resposta = await Tesseract.recognize(
+            arquivo,
+            "por+eng"
+        );
 
-    status.innerHTML = "OCR concluído";
+        const texto = resposta.data.text || "";
 
+        resultado.value = texto;
+
+        mostrarNumeros(texto);
+        mostrarLinhasProvaveis(texto);
+
+        status.innerHTML = "OCR concluído.";
+    }catch(erro){
+        status.innerHTML = "Erro no OCR.";
+        resultado.value = erro.message || erro;
+    }
 });
 
+function mostrarNumeros(texto){
+    const encontrados = texto.match(/\d+(?:[.,]\d+)?/g) || [];
+
+    const unicos = [...new Set(encontrados)]
+        .filter(n => n.length <= 8);
+
+    if(unicos.length === 0){
+        numerosDiv.innerHTML = "Nenhum número encontrado.";
+        return;
+    }
+
+    numerosDiv.innerHTML = unicos.map(n => {
+        return `<span class="numero">${n}</span>`;
+    }).join("");
+}
+
+function mostrarLinhasProvaveis(texto){
+    const linhas = texto
+        .split(/\n+/)
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+
+    const provaveis = linhas.filter(linha => {
+        const l = linha.toLowerCase();
+
+        return (
+            l.includes("chapa") ||
+            l.includes("chapas") ||
+            l.includes("vinco") ||
+            l.includes("of") ||
+            l.includes("p25") ||
+            l.includes("p50") ||
+            l.includes("p60") ||
+            l.includes("onda") ||
+            /\d+\s*[xX]\s*\d+/.test(linha)
+        );
+    });
+
+    if(provaveis.length === 0){
+        linhasPedidoDiv.innerHTML = "Nenhuma linha provável encontrada.";
+        return;
+    }
+
+    linhasPedidoDiv.innerHTML = provaveis.map(l => {
+        return `<div class="linha">${escapeHtml(l)}</div>`;
+    }).join("");
+}
+
+function escapeHtml(texto){
+    return texto
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
 </script>
 
 </body>
