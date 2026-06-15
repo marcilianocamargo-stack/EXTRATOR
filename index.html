@@ -3,82 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>EXTRATOR</title>
-
 <link rel="manifest" href="./manifest.json">
-
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-body{
-    font-family:Arial,sans-serif;
-    background:#f4f4f4;
-    padding:16px;
-}
-
-h2{
-    margin-top:0;
-}
-
-input, button, textarea{
-    width:100%;
-    box-sizing:border-box;
-}
-
-button{
-    padding:14px;
-    margin-top:10px;
-    font-size:18px;
-    font-weight:bold;
-}
-
-textarea{
-    height:260px;
-    margin-top:10px;
-    font-size:16px;
-    padding:8px;
-}
-
-#status{
-    margin-top:15px;
-    font-weight:bold;
-    font-size:18px;
-}
-
-img{
-    width:100%;
-    margin-top:15px;
-    border-radius:8px;
-}
-
-.bloco{
-    background:white;
-    padding:12px;
-    margin-top:15px;
-    border-radius:8px;
-    border:1px solid #ccc;
-}
-
-.numero{
-    display:inline-block;
-    padding:10px 14px;
-    margin:5px;
-    background:#1a3a5c;
-    color:white;
-    border-radius:6px;
-    font-size:18px;
-    font-weight:bold;
-}
-
-.linha{
-    font-family:monospace;
-    background:#eee;
-    padding:8px;
-    margin:5px 0;
-    border-radius:5px;
-    white-space:pre-wrap;
-}
+body{font-family:Arial,sans-serif;background:#f4f4f4;padding:16px}
+input,textarea,button{width:100%;box-sizing:border-box}
+textarea{height:220px;margin-top:10px;font-size:15px;padding:8px}
+img{width:100%;margin-top:15px;border-radius:8px}
+.bloco{background:white;padding:12px;margin-top:15px;border-radius:8px;border:1px solid #ccc}
+.linha{font-family:monospace;background:#eee;padding:8px;margin:5px 0;border-radius:5px;white-space:pre-wrap}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid #ccc;padding:6px;text-align:left}
+th{background:#1a3a5c;color:white}
+#status{margin-top:15px;font-weight:bold;font-size:18px}
 </style>
 </head>
 
@@ -86,29 +25,37 @@ img{
 
 <h2>EXTRATOR</h2>
 
-<input
-    type="file"
-    id="imagem"
-    accept="image/*"
-    capture="environment">
+<input type="file" id="imagem" accept="image/*" capture="environment">
 
 <img id="preview">
 
 <div id="status">Aguardando imagem...</div>
 
 <div class="bloco">
-    <h3>Números encontrados</h3>
-    <div id="numeros"></div>
+<h3>Pedidos extraídos</h3>
+<table>
+<thead>
+<tr>
+<th>OF</th>
+<th>Qtd</th>
+<th>Largura</th>
+<th>Comprimento</th>
+<th>Papel</th>
+<th>Vinco</th>
+</tr>
+</thead>
+<tbody id="tabelaPedidos"></tbody>
+</table>
 </div>
 
 <div class="bloco">
-    <h3>Linhas prováveis de pedido</h3>
-    <div id="linhasPedido"></div>
+<h3>Linhas prováveis</h3>
+<div id="linhasPedido"></div>
 </div>
 
 <div class="bloco">
-    <h3>Texto OCR completo</h3>
-    <textarea id="resultado"></textarea>
+<h3>Texto OCR completo</h3>
+<textarea id="resultado"></textarea>
 </div>
 
 <script>
@@ -120,34 +67,30 @@ const input = document.getElementById("imagem");
 const preview = document.getElementById("preview");
 const resultado = document.getElementById("resultado");
 const status = document.getElementById("status");
-const numerosDiv = document.getElementById("numeros");
 const linhasPedidoDiv = document.getElementById("linhasPedido");
+const tabelaPedidos = document.getElementById("tabelaPedidos");
 
 input.addEventListener("change", async e => {
     const arquivo = e.target.files[0];
-
     if(!arquivo) return;
 
     preview.src = URL.createObjectURL(arquivo);
-
     status.innerHTML = "Lendo OCR... aguarde.";
-
     resultado.value = "";
-    numerosDiv.innerHTML = "";
     linhasPedidoDiv.innerHTML = "";
+    tabelaPedidos.innerHTML = "";
 
     try{
-        const resposta = await Tesseract.recognize(
-            arquivo,
-            "por+eng"
-        );
-
+        const resposta = await Tesseract.recognize(arquivo, "por+eng");
         const texto = resposta.data.text || "";
 
         resultado.value = texto;
 
-        mostrarNumeros(texto);
-        mostrarLinhasProvaveis(texto);
+        const linhas = obterLinhasProvaveis(texto);
+        mostrarLinhas(linhas);
+
+        const pedidos = extrairPedidos(texto);
+        mostrarPedidos(pedidos);
 
         status.innerHTML = "OCR concluído.";
     }catch(erro){
@@ -156,56 +99,188 @@ input.addEventListener("change", async e => {
     }
 });
 
-function mostrarNumeros(texto){
-    const encontrados = texto.match(/\d+(?:[.,]\d+)?/g) || [];
-
-    const unicos = [...new Set(encontrados)]
-        .filter(n => n.length <= 8);
-
-    if(unicos.length === 0){
-        numerosDiv.innerHTML = "Nenhum número encontrado.";
-        return;
-    }
-
-    numerosDiv.innerHTML = unicos.map(n => {
-        return `<span class="numero">${n}</span>`;
-    }).join("");
-}
-
-function mostrarLinhasProvaveis(texto){
-    const linhas = texto
+function obterLinhasProvaveis(texto){
+    return texto
         .split(/\n+/)
         .map(l => l.trim())
-        .filter(l => l.length > 0);
+        .filter(l => l.length > 0)
+        .filter(linha => {
+            const l = linha.toLowerCase();
+            return (
+                l.includes("chapa") ||
+                l.includes("chapas") ||
+                l.includes("vinco") ||
+                l.includes("vincos") ||
+                l.includes("of") ||
+                l.includes("p25") ||
+                l.includes("p50") ||
+                l.includes("p60") ||
+                l.includes("p55") ||
+                l.includes("onda") ||
+                /\d+\s*[xX]\s*\d+/.test(linha)
+            );
+        });
+}
 
-    const provaveis = linhas.filter(linha => {
-        const l = linha.toLowerCase();
-
-        return (
-            l.includes("chapa") ||
-            l.includes("chapas") ||
-            l.includes("vinco") ||
-            l.includes("of") ||
-            l.includes("p25") ||
-            l.includes("p50") ||
-            l.includes("p60") ||
-            l.includes("onda") ||
-            /\d+\s*[xX]\s*\d+/.test(linha)
-        );
-    });
-
-    if(provaveis.length === 0){
+function mostrarLinhas(linhas){
+    if(linhas.length === 0){
         linhasPedidoDiv.innerHTML = "Nenhuma linha provável encontrada.";
         return;
     }
 
-    linhasPedidoDiv.innerHTML = provaveis.map(l => {
+    linhasPedidoDiv.innerHTML = linhas.map(l => {
         return `<div class="linha">${escapeHtml(l)}</div>`;
     }).join("");
 }
 
+function extrairPedidos(texto){
+    const normal = texto
+        .replace(/[–—]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    let pedidos = [];
+
+    pedidos = pedidos.concat(extrairModeloAbapel(normal));
+    pedidos = pedidos.concat(extrairModeloFavinco(normal));
+    pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
+
+    return limparDuplicados(pedidos);
+}
+
+function extrairModeloAbapel(texto){
+    const pedidos = [];
+
+    const regex = /(?:^|\s)(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})\s+(P\d{2}[A-Z]?|P\d{2})/gi;
+
+    let m;
+    while((m = regex.exec(texto)) !== null){
+        pedidos.push({
+            of: procurarOFProximo(texto, m.index),
+            quantidade: limparNumero(m[2]),
+            largura: limparNumero(m[3]),
+            comprimento: limparNumero(m[4]),
+            papel: m[5],
+            vinco: procurarVincoProximo(texto, m.index)
+        });
+    }
+
+    return pedidos;
+}
+
+function extrairModeloFavinco(texto){
+    const pedidos = [];
+
+    const regex = /(\d{2,6})\s+chapas?\s+(P\d{2}[-\s]?[A-Z]?(?:\s+onda\s+[A-Z]{1,2})?)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})(?:\s+vinco\s+([\d\s*xX]+))?/gi;
+
+    let m;
+    while((m = regex.exec(texto)) !== null){
+        pedidos.push({
+            of: "",
+            quantidade: limparNumero(m[1]),
+            largura: limparNumero(m[3]),
+            comprimento: limparNumero(m[4]),
+            papel: limparTexto(m[2]),
+            vinco: m[5] ? limparTexto(m[5]) : ""
+        });
+    }
+
+    return pedidos;
+}
+
+function extrairModeloChapaLinha(texto){
+    const pedidos = [];
+
+    const regex = /Chapa\s+\d+\s*-\s*(\d{2,4})\s*[xX]\s*(\d{2,4})(.*?)(?=Chapa\s+\d+\s*-|$)/gi;
+
+    let m;
+    while((m = regex.exec(texto)) !== null){
+        const bloco = m[3];
+
+        const qtd = (bloco.match(/Quantidade[:\s]+(\d{1,6})/i) || [])[1] || "";
+        const papel = (bloco.match(/Modelo\s+Papel[aã]o[:\s]+([A-Z0-9\s-]+)/i) || [])[1] || "";
+        const onda = (bloco.match(/Tipo\s+de\s+Onda[:\s]+([A-Z]{1,2})/i) || [])[1] || "";
+        const vinco = (bloco.match(/vincos?\s+([\d\s*xX]+)/i) || [])[1] || "";
+
+        pedidos.push({
+            of: "",
+            quantidade: qtd,
+            largura: limparNumero(m[1]),
+            comprimento: limparNumero(m[2]),
+            papel: limparTexto(papel || onda),
+            vinco: limparTexto(vinco)
+        });
+    }
+
+    return pedidos;
+}
+
+function procurarOFProximo(texto, posicao){
+    const janela = texto.slice(posicao, posicao + 250);
+    const m = janela.match(/OF[:\s]*\.?\s*(\d{4,8})/i);
+    return m ? m[1] : "";
+}
+
+function procurarVincoProximo(texto, posicao){
+    const janela = texto.slice(posicao, posicao + 220);
+    const m = janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i);
+    return m ? limparTexto(m[1]) : "";
+}
+
+function mostrarPedidos(pedidos){
+    if(pedidos.length === 0){
+        tabelaPedidos.innerHTML = `
+            <tr>
+                <td colspan="6">Nenhum pedido estruturado encontrado.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tabelaPedidos.innerHTML = pedidos.map(p => `
+        <tr>
+            <td>${escapeHtml(p.of || "")}</td>
+            <td>${escapeHtml(p.quantidade || "")}</td>
+            <td>${escapeHtml(p.largura || "")}</td>
+            <td>${escapeHtml(p.comprimento || "")}</td>
+            <td>${escapeHtml(p.papel || "")}</td>
+            <td>${escapeHtml(p.vinco || "")}</td>
+        </tr>
+    `).join("");
+}
+
+function limparDuplicados(pedidos){
+    const mapa = new Map();
+
+    pedidos.forEach(p => {
+        const chave = [
+            p.of,
+            p.quantidade,
+            p.largura,
+            p.comprimento,
+            p.papel
+        ].join("|");
+
+        if(!mapa.has(chave)){
+            mapa.set(chave, p);
+        }
+    });
+
+    return [...mapa.values()];
+}
+
+function limparNumero(valor){
+    if(!valor) return "";
+    return String(valor).replace(/[^\d]/g, "");
+}
+
+function limparTexto(valor){
+    if(!valor) return "";
+    return String(valor).replace(/\s+/g, " ").trim();
+}
+
 function escapeHtml(texto){
-    return texto
+    return String(texto)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
