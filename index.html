@@ -83,9 +83,9 @@ input.addEventListener("change", async e => {
     status.innerHTML = "Lendo OCR...";
 
     const resposta = await Tesseract.recognize(
-        arquivo,
-        "por"
-    );
+    arquivo,
+    "por+eng"
+);
 
     resultado.value = resposta.data.text;
 
