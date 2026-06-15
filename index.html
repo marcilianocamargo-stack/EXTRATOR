@@ -141,9 +141,10 @@ function extrairPedidos(texto){
 
     let pedidos = [];
 
-    pedidos = pedidos.concat(extrairModeloAbapel(normal));
-    pedidos = pedidos.concat(extrairModeloFavinco(normal));
-    pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
+pedidos = pedidos.concat(extrairModeloPCBOX(normal));
+pedidos = pedidos.concat(extrairModeloAbapel(normal));
+pedidos = pedidos.concat(extrairModeloFavinco(normal));
+pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
 
     return limparDuplicados(pedidos);
 }
@@ -214,7 +215,45 @@ function extrairModeloChapaLinha(texto){
 
     return pedidos;
 }
+function extrairModeloChapaLinha(texto){
 
+   ...
+   
+   return pedidos;
+}
+
+function extrairModeloPCBOX(texto){
+
+    const pedidos = [];
+
+    const numeroPedido = (texto.match(/Número\.?:?\s*(\d+[.,]?\d*)/i) || [])[1] || "";
+
+    const regex = /(?:^|\s)(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})\s+([A-Z0-9\s]+?)(?=\s+\d+[.,]\d{3}|\s+Gr\.|\s+Vincos|\s+OF:|\s+\d{1,2}\s+\d{2}\/\d{2}\/\d{4}|$)/gi;
+
+    let m;
+
+    while((m = regex.exec(texto)) !== null){
+
+        const janela = texto.slice(m.index, m.index + 350);
+
+        const of = (janela.match(/OF[:\s]*\.?\s*(\d{3,8})/i) || [])[1] || "";
+
+        const vinco = (janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i) || [])[1] || "";
+
+        pedidos.push({
+            of: of || numeroPedido,
+            quantidade: limparNumero(m[2]),
+            largura: limparNumero(m[3]),
+            comprimento: limparNumero(m[4]),
+            papel: limparTexto(m[5]),
+            vinco: limparTexto(vinco)
+        });
+    }
+
+    return pedidos;
+}
+
+function procurarOFProximo(texto, posicao){
 function procurarOFProximo(texto, posicao){
     const janela = texto.slice(posicao, posicao + 250);
     const m = janela.match(/OF[:\s]*\.?\s*(\d{4,8})/i);
