@@ -14,7 +14,8 @@ textarea{height:220px;margin-top:10px;font-size:15px;padding:8px}
 img{width:100%;margin-top:15px;border-radius:8px}
 .bloco{background:white;padding:12px;margin-top:15px;border-radius:8px;border:1px solid #ccc}
 .linha{font-family:monospace;background:#eee;padding:8px;margin:5px 0;border-radius:5px;white-space:pre-wrap}
-table{width:100%;border-collapse:collapse;font-size:14px}
+.tabela-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
 th,td{border:1px solid #ccc;padding:6px;text-align:left}
 th{background:#1a3a5c;color:white}
 #status{margin-top:15px;font-weight:bold;font-size:18px}
@@ -33,6 +34,7 @@ th{background:#1a3a5c;color:white}
 
 <div class="bloco">
 <h3>Pedidos extraídos</h3>
+<div class="tabela-wrap">
 <table>
 <thead>
 <tr>
@@ -40,6 +42,7 @@ th{background:#1a3a5c;color:white}
 <th>Qtd</th>
 <th>Largura</th>
 <th>Comprimento</th>
+<th>Papel</th>
 <th>Onda</th>
 <th>Gramatura</th>
 <th>Vinco</th>
@@ -47,6 +50,7 @@ th{background:#1a3a5c;color:white}
 </thead>
 <tbody id="tabelaPedidos"></tbody>
 </table>
+</div>
 </div>
 
 <div class="bloco">
@@ -110,6 +114,7 @@ function obterLinhasProvaveis(texto){
             return (
                 l.includes("chapa") ||
                 l.includes("chapas") ||
+                l.includes("chaps") ||
                 l.includes("vinco") ||
                 l.includes("vincos") ||
                 l.includes("of") ||
@@ -117,6 +122,7 @@ function obterLinhasProvaveis(texto){
                 l.includes("p50") ||
                 l.includes("p60") ||
                 l.includes("p55") ||
+                l.includes("p70") ||
                 l.includes("onda") ||
                 /\d+\s*[xX]\s*\d+/.test(linha)
             );
@@ -146,6 +152,14 @@ function extrairPedidos(texto){
     pedidos = pedidos.concat(extrairModeloFavinco(normal));
     pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
 
+    pedidos.forEach(p => {
+        if(p.onda === undefined || p.gramatura === undefined){
+            const og = extrairOndaGramatura(p.papel || "");
+            if(p.onda === undefined) p.onda = og.onda;
+            if(p.gramatura === undefined) p.gramatura = og.gramatura;
+        }
+    });
+
     return limparDuplicados(pedidos);
 }
 
@@ -172,17 +186,20 @@ function extrairModeloAbapel(texto){
 function extrairModeloFavinco(texto){
     const pedidos = [];
 
-    const regex = /(\d{2,6})\s+chapas?\s+(P\d{2}[-\s]?[A-Z]?(?:\s+onda\s+[A-Z]{1,2})?)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})(?:\s+vinco\s+([\d\s*xX]+))?/gi;
+    const regex = /(\d{2,6})\s+chap\w*\s+(P\d{2}[-\s]?[A-Z]?)\s+onda\s+([A-Z]{1,2})\s+([\d.]+)\s*[xX]\s*([\d.]+)(?:\s+vinco\s+([\dxX]+))?(?:\s*\([^)]*?(\d+)\))?/gi;
 
     let m;
     while((m = regex.exec(texto)) !== null){
         pedidos.push({
             of: "",
             quantidade: limparNumero(m[1]),
-            largura: limparNumero(m[3]),
-            comprimento: limparNumero(m[4]),
+            largura: limparNumero(m[4]),
+            comprimento: limparNumero(m[5]),
             papel: limparTexto(m[2]),
-            vinco: m[5] ? limparTexto(m[5]) : ""
+            onda: limparTexto(m[3]),
+            gramatura: "",
+            vinco: m[6] ? limparTexto(m[6]) : "",
+            ino: m[7] || ""
         });
     }
 
@@ -208,7 +225,8 @@ function extrairModeloChapaLinha(texto){
             quantidade: qtd,
             largura: limparNumero(m[1]),
             comprimento: limparNumero(m[2]),
-            papel: limparTexto(papel || onda),
+            papel: limparTexto(papel),
+            onda: limparTexto(onda),
             vinco: limparTexto(vinco)
         });
     }
@@ -230,12 +248,21 @@ function extrairModeloPCBOX(texto){
         const of = (janela.match(/OF[:\s]*\.?\s*(\d{3,8})/i) || [])[1] || "";
         const vinco = (janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i) || [])[1] || "";
 
+        const papelBruto = limparTexto(m[5]);
+        const og = extrairOndaGramatura(papelBruto);
+        const papelLimpo = papelBruto
+            .replace(/\b[A-Z]{1,2}\s+\d{2,4}\s*[Gg]\b/, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
         pedidos.push({
             of: of || numeroPedido,
             quantidade: limparNumero(m[2]),
             largura: limparNumero(m[3]),
             comprimento: limparNumero(m[4]),
-            papel: limparTexto(m[5]),
+            papel: papelLimpo,
+            onda: og.onda,
+            gramatura: og.gramatura,
             vinco: limparTexto(vinco)
         });
     }
@@ -272,26 +299,24 @@ function mostrarPedidos(pedidos){
     if(pedidos.length === 0){
         tabelaPedidos.innerHTML = `
             <tr>
-                <td colspan="7">Nenhum pedido estruturado encontrado.</td>
+                <td colspan="8">Nenhum pedido estruturado encontrado.</td>
             </tr>
         `;
         return;
     }
 
-    tabelaPedidos.innerHTML = pedidos.map(p => {
-        const { onda, gramatura } = extrairOndaGramatura(p.papel || "");
-        return `
+    tabelaPedidos.innerHTML = pedidos.map(p => `
         <tr>
             <td>${escapeHtml(p.of || "")}</td>
             <td>${escapeHtml(p.quantidade || "")}</td>
             <td>${escapeHtml(p.largura || "")}</td>
             <td>${escapeHtml(p.comprimento || "")}</td>
-            <td>${escapeHtml(onda)}</td>
-            <td>${escapeHtml(gramatura)}</td>
+            <td>${escapeHtml(p.papel || "")}</td>
+            <td>${escapeHtml(p.onda || "")}</td>
+            <td>${escapeHtml(p.gramatura || "")}</td>
             <td>${escapeHtml(p.vinco || "")}</td>
         </tr>
-    `;
-    }).join("");
+    `).join("");
 }
 
 function limparDuplicados(pedidos){
