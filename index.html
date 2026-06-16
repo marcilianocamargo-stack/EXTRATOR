@@ -140,10 +140,10 @@ function extrairPedidos(texto){
         .trim();
 
     let pedidos = [];
-pedidos = pedidos.concat(extrairModeloPCBOX(normal));
-pedidos = pedidos.concat(extrairModeloAbapel(normal));
-pedidos = pedidos.concat(extrairModeloFavinco(normal));
-pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
+    pedidos = pedidos.concat(extrairModeloPCBOX(normal));
+    pedidos = pedidos.concat(extrairModeloAbapel(normal));
+    pedidos = pedidos.concat(extrairModeloFavinco(normal));
+    pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
 
     return limparDuplicados(pedidos);
 }
@@ -214,29 +214,19 @@ function extrairModeloChapaLinha(texto){
 
     return pedidos;
 }
-function extrairModeloChapaLinha(texto){
-
-   ...
-   
-   return pedidos;
-}
 
 function extrairModeloPCBOX(texto){
-
     const pedidos = [];
 
-    const numeroPedido = (texto.match(/Número\.?:?\s*(\d+[.,]?\d*)/i) || [])[1] || "";
+    const numeroPedido = (texto.match(/N[úu]mero\.?:?\s*([\d.,]+)/i) || [])[1] || "";
 
-    const regex = /(?:^|\s)(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})\s+([A-Z0-9\s]+?)(?=\s+\d+[.,]\d{3}|\s+Gr\.|\s+Vincos|\s+OF:|\s+\d{1,2}\s+\d{2}\/\d{2}\/\d{4}|$)/gi;
+    const regex = /(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+([\d.]+)\s*[xX]\s*([\d.]+)\s+(.+?)(?=\s+\d+[.,]\d{3}\b|\s+Gr\.|\s+Vincos|\s+OF[:\s]|$)/gi;
 
     let m;
-
     while((m = regex.exec(texto)) !== null){
-
-        const janela = texto.slice(m.index, m.index + 350);
+        const janela = texto.slice(m.index, m.index + 400);
 
         const of = (janela.match(/OF[:\s]*\.?\s*(\d{3,8})/i) || [])[1] || "";
-
         const vinco = (janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i) || [])[1] || "";
 
         pedidos.push({
@@ -252,7 +242,6 @@ function extrairModeloPCBOX(texto){
     return pedidos;
 }
 
-function procurarOFProximo(texto, posicao){
 function procurarOFProximo(texto, posicao){
     const janela = texto.slice(posicao, posicao + 250);
     const m = janela.match(/OF[:\s]*\.?\s*(\d{4,8})/i);
