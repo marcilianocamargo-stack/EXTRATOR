@@ -6,19 +6,25 @@
 <title>EXTRATOR</title>
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
 body{font-family:Arial,sans-serif;background:#f4f4f4;padding:16px}
-input,textarea,button{width:100%;box-sizing:border-box}
+input,textarea{width:100%;box-sizing:border-box}
 textarea{height:220px;margin-top:10px;font-size:15px;padding:8px}
 img{width:100%;margin-top:15px;border-radius:8px}
 .bloco{background:white;padding:12px;margin-top:15px;border-radius:8px;border:1px solid #ccc}
 .linha{font-family:monospace;background:#eee;padding:8px;margin:5px 0;border-radius:5px;white-space:pre-wrap}
 .tabela-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
 th,td{border:1px solid #ccc;padding:6px;text-align:left}
 th{background:#1a3a5c;color:white}
 #status{margin-top:15px;font-weight:bold;font-size:18px}
+#resumo{margin-top:8px;font-size:15px;color:#333}
+.botoes{display:flex;gap:8px;margin-top:12px}
+.botoes button{flex:1;padding:12px;font-size:15px;border:none;border-radius:8px;color:white;cursor:pointer}
+#btnExcel{background:#1a7a3c}
+#btnLimpar{background:#9c2a2a}
 </style>
 </head>
 
@@ -28,16 +34,23 @@ th{background:#1a3a5c;color:white}
 
 <input type="file" id="imagem" accept="image/*" capture="environment">
 
-<img id="preview">
+<div class="botoes">
+<button id="btnExcel" type="button">Gerar Excel</button>
+<button id="btnLimpar" type="button">Limpar tudo</button>
+</div>
 
 <div id="status">Aguardando imagem...</div>
+<div id="resumo"></div>
+
+<img id="preview">
 
 <div class="bloco">
-<h3>Pedidos extraídos</h3>
+<h3>Pedidos extraídos (todas as folhas)</h3>
 <div class="tabela-wrap">
 <table>
 <thead>
 <tr>
+<th>Pág</th>
 <th>OF</th>
 <th>Qtd</th>
 <th>Largura</th>
@@ -46,6 +59,7 @@ th{background:#1a3a5c;color:white}
 <th>Onda</th>
 <th>Gramatura</th>
 <th>Vinco</th>
+<th>Ino</th>
 </tr>
 </thead>
 <tbody id="tabelaPedidos"></tbody>
@@ -54,12 +68,12 @@ th{background:#1a3a5c;color:white}
 </div>
 
 <div class="bloco">
-<h3>Linhas prováveis</h3>
+<h3>Linhas prováveis (última folha)</h3>
 <div id="linhasPedido"></div>
 </div>
 
 <div class="bloco">
-<h3>Texto OCR completo</h3>
+<h3>Texto OCR completo (última folha)</h3>
 <textarea id="resultado"></textarea>
 </div>
 
@@ -72,18 +86,26 @@ const input = document.getElementById("imagem");
 const preview = document.getElementById("preview");
 const resultado = document.getElementById("resultado");
 const status = document.getElementById("status");
+const resumo = document.getElementById("resumo");
 const linhasPedidoDiv = document.getElementById("linhasPedido");
 const tabelaPedidos = document.getElementById("tabelaPedidos");
+const btnExcel = document.getElementById("btnExcel");
+const btnLimpar = document.getElementById("btnLimpar");
+
+let todosPedidos = [];
+let contadorPagina = 0;
 
 input.addEventListener("change", async e => {
     const arquivo = e.target.files[0];
     if(!arquivo) return;
 
+    contadorPagina++;
+    const paginaAtual = contadorPagina;
+
     preview.src = URL.createObjectURL(arquivo);
-    status.innerHTML = "Lendo OCR... aguarde.";
+    status.innerHTML = "Lendo folha " + paginaAtual + "... aguarde.";
     resultado.value = "";
     linhasPedidoDiv.innerHTML = "";
-    tabelaPedidos.innerHTML = "";
 
     try{
         const resposta = await Tesseract.recognize(arquivo, "por+eng");
@@ -95,14 +117,76 @@ input.addEventListener("change", async e => {
         mostrarLinhas(linhas);
 
         const pedidos = extrairPedidos(texto);
-        mostrarPedidos(pedidos);
+        pedidos.forEach(p => p.pagina = paginaAtual);
+        todosPedidos = todosPedidos.concat(pedidos);
 
-        status.innerHTML = "OCR concluído.";
+        mostrarPedidos(todosPedidos);
+        atualizarResumo();
+
+        status.innerHTML = "Folha " + paginaAtual + " concluída. Pode tirar a próxima.";
     }catch(erro){
-        status.innerHTML = "Erro no OCR.";
+        status.innerHTML = "Erro no OCR da folha " + paginaAtual + ".";
         resultado.value = erro.message || erro;
+    }finally{
+        input.value = "";
     }
 });
+
+btnLimpar.addEventListener("click", () => {
+    todosPedidos = [];
+    contadorPagina = 0;
+    tabelaPedidos.innerHTML = "";
+    linhasPedidoDiv.innerHTML = "";
+    resultado.value = "";
+    preview.removeAttribute("src");
+    status.innerHTML = "Lista zerada. Aguardando imagem...";
+    resumo.innerHTML = "";
+});
+
+btnExcel.addEventListener("click", gerarExcel);
+
+function atualizarResumo(){
+    resumo.innerHTML = "Folhas processadas: " + contadorPagina + " | Itens na lista: " + todosPedidos.length;
+}
+
+function gerarExcel(){
+    if(todosPedidos.length === 0){
+        status.innerHTML = "Nenhum pedido para exportar.";
+        return;
+    }
+    if(typeof XLSX === "undefined"){
+        status.innerHTML = "Biblioteca do Excel não carregou. Verifique a internet e recarregue.";
+        return;
+    }
+
+    const dados = todosPedidos.map(p => ({
+        "Pág": p.pagina || "",
+        "OF": p.of || "",
+        "Qtd": p.quantidade ? Number(p.quantidade) : "",
+        "Largura": p.largura ? Number(p.largura) : "",
+        "Comprimento": p.comprimento ? Number(p.comprimento) : "",
+        "Papel": p.papel || "",
+        "Onda": p.onda || "",
+        "Gramatura": p.gramatura ? Number(p.gramatura) : "",
+        "Vinco": p.vinco || "",
+        "Ino": p.ino || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+    const agora = new Date();
+    const nome = "pedidos_" +
+        agora.getFullYear() +
+        String(agora.getMonth() + 1).padStart(2, "0") +
+        String(agora.getDate()).padStart(2, "0") + "_" +
+        String(agora.getHours()).padStart(2, "0") +
+        String(agora.getMinutes()).padStart(2, "0") + ".xlsx";
+
+    XLSX.writeFile(wb, nome);
+    status.innerHTML = "Excel gerado: " + nome;
+}
 
 function obterLinhasProvaveis(texto){
     return texto
@@ -299,7 +383,7 @@ function mostrarPedidos(pedidos){
     if(pedidos.length === 0){
         tabelaPedidos.innerHTML = `
             <tr>
-                <td colspan="8">Nenhum pedido estruturado encontrado.</td>
+                <td colspan="10">Nenhum pedido estruturado encontrado.</td>
             </tr>
         `;
         return;
@@ -307,6 +391,7 @@ function mostrarPedidos(pedidos){
 
     tabelaPedidos.innerHTML = pedidos.map(p => `
         <tr>
+            <td>${escapeHtml(p.pagina || "")}</td>
             <td>${escapeHtml(p.of || "")}</td>
             <td>${escapeHtml(p.quantidade || "")}</td>
             <td>${escapeHtml(p.largura || "")}</td>
@@ -315,6 +400,7 @@ function mostrarPedidos(pedidos){
             <td>${escapeHtml(p.onda || "")}</td>
             <td>${escapeHtml(p.gramatura || "")}</td>
             <td>${escapeHtml(p.vinco || "")}</td>
+            <td>${escapeHtml(p.ino || "")}</td>
         </tr>
     `).join("");
 }
@@ -328,7 +414,9 @@ function limparDuplicados(pedidos){
             p.quantidade,
             p.largura,
             p.comprimento,
-            p.papel
+            p.papel,
+            p.vinco,
+            p.ino || ""
         ].join("|");
 
         if(!mapa.has(chave)){
