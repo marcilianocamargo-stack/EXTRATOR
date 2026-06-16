@@ -40,7 +40,8 @@ th{background:#1a3a5c;color:white}
 <th>Qtd</th>
 <th>Largura</th>
 <th>Comprimento</th>
-<th>Papel</th>
+<th>Onda</th>
+<th>Gramatura</th>
 <th>Vinco</th>
 </tr>
 </thead>
@@ -254,26 +255,43 @@ function procurarVincoProximo(texto, posicao){
     return m ? limparTexto(m[1]) : "";
 }
 
+function extrairOndaGramatura(papel){
+    const t = limparTexto(papel);
+
+    let onda = (t.match(/\b([A-Z]{1,2})\s+\d{2,4}\s*[Gg]\b/) || [])[1] || "";
+    if(!onda){
+        onda = (t.match(/onda\s+([A-Z]{1,2})\b/i) || [])[1] || "";
+    }
+
+    const gramatura = (t.match(/(\d{2,4})\s*[Gg]\b/) || [])[1] || "";
+
+    return { onda, gramatura };
+}
+
 function mostrarPedidos(pedidos){
     if(pedidos.length === 0){
         tabelaPedidos.innerHTML = `
             <tr>
-                <td colspan="6">Nenhum pedido estruturado encontrado.</td>
+                <td colspan="7">Nenhum pedido estruturado encontrado.</td>
             </tr>
         `;
         return;
     }
 
-    tabelaPedidos.innerHTML = pedidos.map(p => `
+    tabelaPedidos.innerHTML = pedidos.map(p => {
+        const { onda, gramatura } = extrairOndaGramatura(p.papel || "");
+        return `
         <tr>
             <td>${escapeHtml(p.of || "")}</td>
             <td>${escapeHtml(p.quantidade || "")}</td>
             <td>${escapeHtml(p.largura || "")}</td>
             <td>${escapeHtml(p.comprimento || "")}</td>
-            <td>${escapeHtml(p.papel || "")}</td>
+            <td>${escapeHtml(onda)}</td>
+            <td>${escapeHtml(gramatura)}</td>
             <td>${escapeHtml(p.vinco || "")}</td>
         </tr>
-    `).join("");
+    `;
+    }).join("");
 }
 
 function limparDuplicados(pedidos){
