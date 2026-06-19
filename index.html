@@ -2,447 +2,1079 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>EXTRATOR</title>
 <link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
-body{font-family:Arial,sans-serif;background:#f4f4f4;padding:16px}
-input,textarea{width:100%;box-sizing:border-box}
-textarea{height:220px;margin-top:10px;font-size:15px;padding:8px}
-img{width:100%;margin-top:15px;border-radius:8px}
-.bloco{background:white;padding:12px;margin-top:15px;border-radius:8px;border:1px solid #ccc}
-.linha{font-family:monospace;background:#eee;padding:8px;margin:5px 0;border-radius:5px;white-space:pre-wrap}
-.tabela-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
-th,td{border:1px solid #ccc;padding:6px;text-align:left}
-th{background:#1a3a5c;color:white}
-#status{margin-top:15px;font-weight:bold;font-size:18px}
-#resumo{margin-top:8px;font-size:15px;color:#333}
-.botoes{display:flex;gap:8px;margin-top:12px}
-.botoes button{flex:1;padding:12px;font-size:15px;border:none;border-radius:8px;color:white;cursor:pointer}
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Portrait Lock ─────────────────────────────────────────────────────── */
+@media screen and (orientation:landscape){
+  #rotate-notice{display:flex!important}
+  #app{display:none!important}
+}
+
+body{
+  font-family:Arial,sans-serif;
+  background:#eef2f7;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── Rotate Notice ─────────────────────────────────────────────────────── */
+#rotate-notice{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#1a3a5c;
+  color:#fff;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  text-align:center;
+  padding:24px;
+  gap:16px;
+}
+#rotate-notice svg{width:64px;height:64px;opacity:.9}
+#rotate-notice p{font-size:17px;line-height:1.5}
+
+/* ── App Shell ─────────────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;min-height:100vh}
+
+header{
+  background:#1a3a5c;
+  color:#fff;
+  padding:11px 16px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+header h1{font-size:17px;font-weight:700;flex:1;letter-spacing:.5px}
+.badge{
+  background:#d4edda;
+  color:#155724;
+  padding:3px 10px;
+  border-radius:12px;
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+main{padding:12px;flex:1;display:flex;flex-direction:column;gap:12px}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
+.card{
+  background:#fff;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.1);
+}
+.card-header{
+  background:#1a3a5c;
+  color:#fff;
+  padding:9px 14px;
+  font-size:13px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.card-header .hint{
+  margin-left:auto;
+  font-size:11px;
+  font-weight:400;
+  opacity:.8;
+}
+
+/* ── Viewfinder ────────────────────────────────────────────────────────── */
+#viewfinder{
+  position:relative;
+  width:100%;
+  aspect-ratio:3/4;
+  background:#000;
+  overflow:hidden;
+}
+#video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+#overlay-canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+#cam-controls{
+  padding:10px 12px;
+  display:flex;
+  gap:8px;
+  align-items:stretch;
+}
+#btnCapturar{
+  flex:1;
+  padding:13px;
+  background:#1a3a5c;
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  transition:opacity .15s;
+}
+#btnCapturar:active{opacity:.75}
+#btnCapturar:disabled{background:#999;cursor:not-allowed}
+
+.file-label{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:10px 14px;
+  background:#e8f4e8;
+  color:#155724;
+  border-radius:10px;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+  gap:3px;
+  line-height:1.2;
+  min-width:60px;
+  text-align:center;
+}
+.file-label span{font-size:22px}
+input[type="file"]{display:none}
+
+/* ── Status Bar ────────────────────────────────────────────────────────── */
+#status-bar{padding:12px 14px}
+#status{font-weight:700;font-size:14px;color:#1a3a5c}
+#resumo{font-size:12px;color:#666;margin-top:4px}
+#progress{
+  height:4px;
+  background:#e0e0e0;
+  border-radius:2px;
+  margin-top:8px;
+  overflow:hidden;
+  display:none;
+}
+#progress-bar{
+  height:100%;
+  background:#1a7a3c;
+  width:0%;
+  transition:width .25s;
+  border-radius:2px;
+}
+
+/* ── Preview ───────────────────────────────────────────────────────────── */
+#preview-section{display:none}
+#preview-imgs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:10px;
+}
+.preview-item{text-align:center}
+.preview-item label{font-size:11px;color:#666;display:block;margin-bottom:4px;font-weight:600}
+.preview-item img{width:100%;border-radius:6px;border:1px solid #ddd;display:block}
+
+/* ── Action Buttons ────────────────────────────────────────────────────── */
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.action-row button{
+  padding:13px;
+  border:none;
+  border-radius:10px;
+  color:#fff;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  transition:opacity .15s;
+}
+.action-row button:active{opacity:.8}
 #btnExcel{background:#1a7a3c}
 #btnLimpar{background:#9c2a2a}
+
+/* ── Results Table ─────────────────────────────────────────────────────── */
+.tabela-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}
+th{
+  background:#1a3a5c;
+  color:#fff;
+  padding:8px 6px;
+  text-align:left;
+  white-space:nowrap;
+  font-size:11px;
+  position:sticky;
+  top:0;
+}
+td{
+  border:1px solid #e8e8e8;
+  padding:6px 5px;
+  vertical-align:top;
+  color:#222;
+}
+tr:nth-child(even) td{background:#f7f9fc}
+td[contenteditable="true"]{
+  outline:none;
+  min-width:50px;
+  cursor:text;
+}
+td[contenteditable="true"]:focus{
+  background:#fffbea!important;
+  box-shadow:inset 0 0 0 2px #e6a817;
+}
+.btn-del{
+  background:#c0392b;
+  color:#fff;
+  border:none;
+  border-radius:4px;
+  padding:3px 7px;
+  cursor:pointer;
+  font-size:11px;
+  white-space:nowrap;
+}
+#btnAddLinha{
+  margin:8px;
+  padding:7px 14px;
+  background:#1a3a5c;
+  color:#fff;
+  border:none;
+  border-radius:7px;
+  font-size:12px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+
+/* ── Linhas Identificadas ──────────────────────────────────────────────── */
+.linha{
+  font-family:monospace;
+  background:#f0f4f8;
+  padding:7px 10px;
+  margin:4px 8px;
+  border-radius:5px;
+  white-space:pre-wrap;
+  font-size:12px;
+  border-left:3px solid #1a3a5c;
+  word-break:break-all;
+}
+
+/* ── OCR Textarea ──────────────────────────────────────────────────────── */
+#resultado{
+  width:100%;
+  height:170px;
+  border:none;
+  padding:10px;
+  font-family:monospace;
+  font-size:12px;
+  resize:vertical;
+  color:#333;
+  outline:none;
+}
 </style>
 </head>
 
 <body>
 
-<h2>EXTRATOR</h2>
-
-<input type="file" id="imagem" accept="image/*" capture="environment">
-
-<div class="botoes">
-<button id="btnExcel" type="button">Gerar Excel</button>
-<button id="btnLimpar" type="button">Limpar tudo</button>
+<!-- Rotate Notice (Landscape) -->
+<div id="rotate-notice">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="4" y="2" width="16" height="20" rx="2"/>
+    <circle cx="12" cy="17" r="1"/>
+    <path d="M8 2v2M16 2v2" stroke-dasharray="2 2"/>
+    <path d="M17 8l-2 2-2-2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M19 12a7 7 0 1 0-7 7" stroke-linecap="round"/>
+  </svg>
+  <p>Gire o dispositivo para o modo<br><strong>Retrato (Vertical)</strong><br>para usar o Extrator.</p>
 </div>
 
-<div id="status">Aguardando imagem...</div>
-<div id="resumo"></div>
+<!-- App -->
+<div id="app">
 
-<img id="preview">
+  <header>
+    <h1>&#128230; EXTRATOR</h1>
+    <span class="badge" id="badge-count">0 itens</span>
+  </header>
 
-<div class="bloco">
-<h3>Pedidos extraídos (todas as folhas)</h3>
-<div class="tabela-wrap">
-<table>
-<thead>
-<tr>
-<th>Pág</th>
-<th>OF</th>
-<th>Qtd</th>
-<th>Largura</th>
-<th>Comprimento</th>
-<th>Papel</th>
-<th>Onda</th>
-<th>Gramatura</th>
-<th>Vinco</th>
-<th>Ino</th>
-</tr>
-</thead>
-<tbody id="tabelaPedidos"></tbody>
-</table>
-</div>
+  <main>
+
+    <!-- Camera -->
+    <div class="card">
+      <div class="card-header">&#128247; Câmera — Documente o Pedido</div>
+      <div id="viewfinder">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay-canvas"></canvas>
+      </div>
+      <div id="cam-controls">
+        <button id="btnCapturar" disabled>&#128248; Capturar</button>
+        <label class="file-label" for="imagem">
+          <span>&#128444;</span>Galeria
+        </label>
+        <input type="file" id="imagem" accept="image/*">
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <div id="status-bar">
+        <div id="status">Iniciando câmera...</div>
+        <div id="resumo"></div>
+        <div id="progress"><div id="progress-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card" id="preview-section">
+      <div class="card-header">&#128269; Pré-visualização</div>
+      <div id="preview-imgs">
+        <div class="preview-item">
+          <label>Original</label>
+          <img id="preview-original" alt="original">
+        </div>
+        <div class="preview-item">
+          <label>Processada (P&amp;B)</label>
+          <img id="preview-processada" alt="processada">
+        </div>
+      </div>
+    </div>
+
+    <!-- Export / Clear -->
+    <div class="action-row">
+      <button id="btnExcel">&#128202; Gerar Excel</button>
+      <button id="btnLimpar">&#128465; Limpar tudo</button>
+    </div>
+
+    <!-- Results Table -->
+    <div class="card">
+      <div class="card-header">
+        &#128203; Pedidos Extraídos
+        <span class="hint">Toque para editar</span>
+      </div>
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pág</th>
+              <th>OC / OF</th>
+              <th>Qtd</th>
+              <th>Larg</th>
+              <th>Comp</th>
+              <th>Papel</th>
+              <th>Onda</th>
+              <th>Gram</th>
+              <th>Vinco</th>
+              <th>Ino</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabelaPedidos"></tbody>
+        </table>
+      </div>
+      <button id="btnAddLinha">&#43; Adicionar linha</button>
+    </div>
+
+    <!-- Linhas Identificadas -->
+    <div class="card" id="linhas-section">
+      <div class="card-header">&#128270; Linhas Identificadas</div>
+      <div id="linhasPedido" style="padding-bottom:8px"></div>
+    </div>
+
+    <!-- OCR Text -->
+    <div class="card">
+      <div class="card-header">&#128196; Texto OCR Completo</div>
+      <textarea id="resultado" placeholder="Texto extraído aparecerá aqui..."></textarea>
+    </div>
+
+  </main>
 </div>
 
-<div class="bloco">
-<h3>Linhas prováveis (última folha)</h3>
-<div id="linhasPedido"></div>
-</div>
-
-<div class="bloco">
-<h3>Texto OCR completo (última folha)</h3>
-<textarea id="resultado"></textarea>
-</div>
+<!-- Hidden processing canvas -->
+<canvas id="processing-canvas" style="display:none"></canvas>
 
 <script>
 if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("./sw.js");
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
 
-const input = document.getElementById("imagem");
-const preview = document.getElementById("preview");
-const resultado = document.getElementById("resultado");
-const status = document.getElementById("status");
-const resumo = document.getElementById("resumo");
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const video           = document.getElementById("video");
+const overlayCanvas   = document.getElementById("overlay-canvas");
+const processingCanvas= document.getElementById("processing-canvas");
+const btnCapturar     = document.getElementById("btnCapturar");
+const fileInput       = document.getElementById("imagem");
+const previewSection  = document.getElementById("preview-section");
+const previewOriginal = document.getElementById("preview-original");
+const previewProcessada= document.getElementById("preview-processada");
+const status          = document.getElementById("status");
+const resumo          = document.getElementById("resumo");
+const progress        = document.getElementById("progress");
+const progressBar     = document.getElementById("progress-bar");
 const linhasPedidoDiv = document.getElementById("linhasPedido");
-const tabelaPedidos = document.getElementById("tabelaPedidos");
-const btnExcel = document.getElementById("btnExcel");
-const btnLimpar = document.getElementById("btnLimpar");
+const tabelaPedidos   = document.getElementById("tabelaPedidos");
+const btnExcel        = document.getElementById("btnExcel");
+const btnLimpar       = document.getElementById("btnLimpar");
+const btnAddLinha     = document.getElementById("btnAddLinha");
+const badgeCount      = document.getElementById("badge-count");
+const resultado       = document.getElementById("resultado");
 
 let todosPedidos = [];
 let contadorPagina = 0;
+let mediaStream = null;
 
-input.addEventListener("change", async e => {
-    const arquivo = e.target.files[0];
-    if(!arquivo) return;
-
-    contadorPagina++;
-    const paginaAtual = contadorPagina;
-
-    preview.src = URL.createObjectURL(arquivo);
-    status.innerHTML = "Lendo folha " + paginaAtual + "... aguarde.";
-    resultado.value = "";
-    linhasPedidoDiv.innerHTML = "";
-
-    try{
-        const resposta = await Tesseract.recognize(arquivo, "por+eng");
-        const texto = resposta.data.text || "";
-
-        resultado.value = texto;
-
-        const linhas = obterLinhasProvaveis(texto);
-        mostrarLinhas(linhas);
-
-        const pedidos = extrairPedidos(texto);
-        pedidos.forEach(p => p.pagina = paginaAtual);
-        todosPedidos = todosPedidos.concat(pedidos);
-
-        mostrarPedidos(todosPedidos);
-        atualizarResumo();
-
-        status.innerHTML = "Folha " + paginaAtual + " concluída. Pode tirar a próxima.";
-    }catch(erro){
-        status.innerHTML = "Erro no OCR da folha " + paginaAtual + ".";
-        resultado.value = erro.message || erro;
-    }finally{
-        input.value = "";
-    }
-});
-
-btnLimpar.addEventListener("click", () => {
-    todosPedidos = [];
-    contadorPagina = 0;
-    tabelaPedidos.innerHTML = "";
-    linhasPedidoDiv.innerHTML = "";
-    resultado.value = "";
-    preview.removeAttribute("src");
-    status.innerHTML = "Lista zerada. Aguardando imagem...";
-    resumo.innerHTML = "";
-});
-
-btnExcel.addEventListener("click", gerarExcel);
-
-function atualizarResumo(){
-    resumo.innerHTML = "Folhas processadas: " + contadorPagina + " | Itens na lista: " + todosPedidos.length;
+// ── Camera ───────────────────────────────────────────────────────────────────
+async function iniciarCamera(){
+  try{
+    // Solicita câmera traseira com resolução máxima disponível
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:"environment"},
+        width:{ideal:4096},
+        height:{ideal:4096}
+      }
+    });
+    video.srcObject = mediaStream;
+    video.onloadedmetadata = ()=>{
+      video.play();
+      btnCapturar.disabled = false;
+      status.textContent = "Câmera pronta. Aponte para o documento.";
+      iniciarOverlay();
+    };
+  }catch(err){
+    status.textContent = "Câmera não disponível. Use a opção Galeria.";
+    console.warn("Camera error:", err);
+  }
 }
 
-function gerarExcel(){
-    if(todosPedidos.length === 0){
-        status.innerHTML = "Nenhum pedido para exportar.";
-        return;
-    }
-    if(typeof XLSX === "undefined"){
-        status.innerHTML = "Biblioteca do Excel não carregou. Verifique a internet e recarregue.";
-        return;
-    }
-
-    const dados = todosPedidos.map(p => ({
-        "Pág": p.pagina || "",
-        "OF": p.of || "",
-        "Qtd": p.quantidade ? Number(p.quantidade) : "",
-        "Largura": p.largura ? Number(p.largura) : "",
-        "Comprimento": p.comprimento ? Number(p.comprimento) : "",
-        "Papel": p.papel || "",
-        "Onda": p.onda || "",
-        "Gramatura": p.gramatura ? Number(p.gramatura) : "",
-        "Vinco": p.vinco || "",
-        "Ino": p.ino || ""
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(dados);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
-
-    const agora = new Date();
-    const nome = "pedidos_" +
-        agora.getFullYear() +
-        String(agora.getMonth() + 1).padStart(2, "0") +
-        String(agora.getDate()).padStart(2, "0") + "_" +
-        String(agora.getHours()).padStart(2, "0") +
-        String(agora.getMinutes()).padStart(2, "0") + ".xlsx";
-
-    XLSX.writeFile(wb, nome);
-    status.innerHTML = "Excel gerado: " + nome;
+// ── Overlay Guide Rectangle ───────────────────────────────────────────────────
+function iniciarOverlay(){
+  const resizeObs = new ResizeObserver(()=>renderOverlay());
+  resizeObs.observe(overlayCanvas.parentElement);
+  renderOverlay();
 }
 
+function renderOverlay(){
+  const el = overlayCanvas.parentElement;
+  const W = overlayCanvas.width  = el.offsetWidth;
+  const H = overlayCanvas.height = el.offsetHeight;
+  const ctx = overlayCanvas.getContext("2d");
+
+  ctx.clearRect(0,0,W,H);
+
+  // Margens do retângulo guia (6% h, 5% v)
+  const mx = W * .06;
+  const my = H * .05;
+  const rw = W - mx * 2;
+  const rh = H - my * 2;
+  const r  = 10;
+
+  // Escurecimento geral
+  ctx.fillStyle = "rgba(0,0,0,.45)";
+  ctx.fillRect(0,0,W,H);
+
+  // Recorte transparente (janela do documento)
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  rrect(ctx, mx, my, rw, rh, r);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  // Borda verde do guia
+  ctx.strokeStyle = "#00FF88";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  rrect(ctx, mx, my, rw, rh, r);
+  ctx.stroke();
+
+  // Cantos marcados
+  const cl = 22;
+  ctx.strokeStyle = "#00FF88";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  [
+    [mx, my, 1, 1],
+    [mx+rw, my, -1, 1],
+    [mx, my+rh, 1, -1],
+    [mx+rw, my+rh, -1, -1]
+  ].forEach(([x,y,sx,sy])=>{
+    ctx.beginPath();
+    ctx.moveTo(x, y + sy*cl);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + sx*cl, y);
+    ctx.stroke();
+  });
+
+  // Texto guia
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.font = "bold 13px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Centralize o documento", W/2, my - 10);
+}
+
+function rrect(ctx, x, y, w, h, r){
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+// ── Image Preprocessing ───────────────────────────────────────────────────────
+// Grayscale + Threshold de Otsu para binarização adaptativa
+function preprocessarImagem(imgEl){
+  const W = imgEl.videoWidth  || imgEl.naturalWidth  || imgEl.width;
+  const H = imgEl.videoHeight || imgEl.naturalHeight || imgEl.height;
+
+  // Redimensiona imagens muito grandes para acelerar o OCR sem perder qualidade
+  const MAX = 2400;
+  const scale = Math.min(1, MAX / Math.max(W, H));
+  const cw = Math.round(W * scale);
+  const ch = Math.round(H * scale);
+
+  processingCanvas.width  = cw;
+  processingCanvas.height = ch;
+  const ctx = processingCanvas.getContext("2d");
+  ctx.drawImage(imgEl, 0, 0, cw, ch);
+
+  const imgData = ctx.getImageData(0, 0, cw, ch);
+  const data = imgData.data;
+
+  // Passo 1: converter para escala de cinza
+  const gray = new Uint8Array(cw * ch);
+  for(let i=0, g=0; i < data.length; i+=4, g++){
+    gray[g] = Math.round(data[i]*.299 + data[i+1]*.587 + data[i+2]*.114);
+  }
+
+  // Passo 2: calcular limiar de Otsu
+  const threshold = calcularOtsu(gray);
+
+  // Passo 3: binarização (preto e branco)
+  for(let i=0, g=0; i < data.length; i+=4, g++){
+    const val = gray[g] >= threshold ? 255 : 0;
+    data[i] = data[i+1] = data[i+2] = val;
+    // alpha inalterado
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return processingCanvas.toDataURL("image/png");
+}
+
+function calcularOtsu(gray){
+  const hist = new Int32Array(256);
+  for(let i=0; i<gray.length; i++) hist[gray[i]]++;
+
+  const N = gray.length;
+  let soma = 0;
+  for(let t=0; t<256; t++) soma += t * hist[t];
+
+  let somaB=0, wB=0, maxVar=0, limiar=128;
+  for(let t=0; t<256; t++){
+    wB += hist[t];
+    if(!wB) continue;
+    const wF = N - wB;
+    if(!wF) break;
+    somaB += t * hist[t];
+    const mB = somaB / wB;
+    const mF = (soma - somaB) / wF;
+    const varB = wB * wF * (mB - mF) ** 2;
+    if(varB > maxVar){ maxVar = varB; limiar = t; }
+  }
+  return limiar;
+}
+
+// ── Capture Events ────────────────────────────────────────────────────────────
+btnCapturar.addEventListener("click", ()=>{
+  if(!mediaStream) return;
+  const snap = document.createElement("canvas");
+  snap.width  = video.videoWidth;
+  snap.height = video.videoHeight;
+  snap.getContext("2d").drawImage(video, 0, 0);
+  processarImagem(snap.toDataURL("image/jpeg", .95));
+});
+
+fileInput.addEventListener("change", e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => processarImagem(ev.target.result);
+  r.readAsDataURL(f);
+  fileInput.value = "";
+});
+
+// ── OCR Pipeline ──────────────────────────────────────────────────────────────
+async function processarImagem(originalUrl){
+  contadorPagina++;
+  const paginaAtual = contadorPagina;
+
+  previewOriginal.src = originalUrl;
+  previewSection.style.display = "";
+
+  // Pré-processamento
+  const img = new Image();
+  img.src = originalUrl;
+  await new Promise(res => { img.onload = res; });
+  const processadaUrl = preprocessarImagem(img);
+  previewProcessada.src = processadaUrl;
+
+  status.textContent = "Processando folha " + paginaAtual + "...";
+  resultado.value = "";
+  linhasPedidoDiv.innerHTML = "";
+  progress.style.display = "";
+  progressBar.style.width = "8%";
+  btnCapturar.disabled = true;
+
+  try{
+    const resp = await Tesseract.recognize(processadaUrl, "por+eng", {
+      logger: m=>{
+        if(m.status === "recognizing text"){
+          progressBar.style.width = (8 + m.progress * 87) + "%";
+        }
+      }
+    });
+
+    progressBar.style.width = "100%";
+    const texto = resp.data.text || "";
+    resultado.value = texto;
+
+    mostrarLinhas(obterLinhasProvaveis(texto));
+
+    const pedidos = extrairPedidos(texto);
+    pedidos.forEach(p => p.pagina = paginaAtual);
+    todosPedidos = todosPedidos.concat(pedidos);
+
+    mostrarPedidos(todosPedidos);
+    atualizarResumo();
+
+    status.textContent =
+      "Folha " + paginaAtual + " concluída — " +
+      pedidos.length + " item(s) encontrado(s).";
+  }catch(err){
+    status.textContent = "Erro no OCR da folha " + paginaAtual + ".";
+    resultado.value = err.message || String(err);
+  }finally{
+    progress.style.display = "none";
+    progressBar.style.width = "0%";
+    if(mediaStream) btnCapturar.disabled = false;
+  }
+}
+
+// ── Likely Lines Filter ───────────────────────────────────────────────────────
 function obterLinhasProvaveis(texto){
-    return texto
-        .split(/\n+/)
-        .map(l => l.trim())
-        .filter(l => l.length > 0)
-        .filter(linha => {
-            const l = linha.toLowerCase();
-            return (
-                l.includes("chapa") ||
-                l.includes("chapas") ||
-                l.includes("chaps") ||
-                l.includes("vinco") ||
-                l.includes("vincos") ||
-                l.includes("of") ||
-                l.includes("p25") ||
-                l.includes("p50") ||
-                l.includes("p60") ||
-                l.includes("p55") ||
-                l.includes("p70") ||
-                l.includes("onda") ||
-                /\d+\s*[xX]\s*\d+/.test(linha)
-            );
-        });
+  return texto
+    .split(/\n+/)
+    .map(l => l.trim())
+    .filter(l => l.length > 4)
+    .filter(l => {
+      const lo = l.toLowerCase();
+      return (
+        lo.includes("chapa") || lo.includes("vinco") ||
+        lo.includes(" of ") || lo.includes(" oc ") ||
+        lo.includes("quant") || lo.includes("qnd") ||
+        lo.includes("larg") || lo.includes("comp") ||
+        lo.includes("papel") || lo.includes("produto") ||
+        lo.includes("onda") || lo.includes("número") ||
+        lo.includes("numero") || lo.includes("pedido") ||
+        lo.includes("p25") || lo.includes("p50") ||
+        lo.includes("p60") || lo.includes("p55") || lo.includes("p70") ||
+        /\d+\s*[xX×]\s*\d+/.test(l)
+      );
+    });
 }
 
 function mostrarLinhas(linhas){
-    if(linhas.length === 0){
-        linhasPedidoDiv.innerHTML = "Nenhuma linha provável encontrada.";
-        return;
-    }
-
-    linhasPedidoDiv.innerHTML = linhas.map(l => {
-        return `<div class="linha">${escapeHtml(l)}</div>`;
-    }).join("");
+  if(!linhas.length){
+    linhasPedidoDiv.innerHTML =
+      "<p style='padding:8px 12px;color:#666;font-size:12px'>Nenhuma linha identificada.</p>";
+    return;
+  }
+  linhasPedidoDiv.innerHTML = linhas
+    .map(l => `<div class="linha">${escHtml(l)}</div>`)
+    .join("");
 }
 
+// ── Extraction Engine ──────────────────────────────────────────────────────────
 function extrairPedidos(texto){
-    const normal = texto
-        .replace(/[–—]/g, "-")
-        .replace(/\s+/g, " ")
-        .trim();
+  const t = normalizarTexto(texto);
 
-    let pedidos = [];
-    pedidos = pedidos.concat(extrairModeloPCBOX(normal));
-    pedidos = pedidos.concat(extrairModeloAbapel(normal));
-    pedidos = pedidos.concat(extrairModeloFavinco(normal));
-    pedidos = pedidos.concat(extrairModeloChapaLinha(normal));
+  let lista = [];
+  lista = lista.concat(extrairModeloPCBOX(t));
+  lista = lista.concat(extrairModeloAbapel(t));
+  lista = lista.concat(extrairModeloFavinco(t));
+  lista = lista.concat(extrairModeloChapaLinha(t));
+  lista = lista.concat(extrairModeloGenerico(t));
 
-    pedidos.forEach(p => {
-        if(p.onda === undefined || p.gramatura === undefined){
-            const og = extrairOndaGramatura(p.papel || "");
-            if(p.onda === undefined) p.onda = og.onda;
-            if(p.gramatura === undefined) p.gramatura = og.gramatura;
-        }
+  // Complementar onda/gramatura a partir do campo papel
+  lista.forEach(p=>{
+    if(!p.onda || !p.gramatura){
+      const og = parseOndaGramatura(p.papel || "");
+      if(!p.onda) p.onda = og.onda;
+      if(!p.gramatura) p.gramatura = og.gramatura;
+    }
+  });
+
+  return limparDuplicados(lista);
+}
+
+function normalizarTexto(t){
+  return t
+    .replace(/[–—]/g, "-")
+    .replace(/\r\n/g,"\n")
+    .replace(/\t/g," ")
+    .replace(/ {2,}/g," ")
+    .trim();
+}
+
+// ── OC extractor (Ordem de Compra / Número do Pedido) ────────────────────────
+function extrairOC(t){
+  const padroes = [
+    /N[úu]mero\.?[:\s]*\.?\s*([\d.,:]+)/i,          // Número.: 7.959
+    /Ordem\s+de\s+Compra\s*:?\s*([\d.,]+)/i,
+    /\bOC\s*[:\-]?\s*([\d.,]+)/i,
+    /\bPedido\s*(?:N[°oº]?\.?)?\s*:?\s*([\d.,]+)/i, // Pedido Nº 1234
+    /\bPed\.?\s*:?\s*([\d.,]+)/i,
+    /N[°oº]\s*\.?\s*([\d.,]+)/i,                    // N° 7.959
+  ];
+  for(const re of padroes){
+    const m = t.match(re);
+    if(m) return limNum(m[1]);
+  }
+  return "";
+}
+
+// ── Dimension extractor (NNN x NNN ou NNN X NNN) ─────────────────────────────
+function extrairDim(t){
+  const m = t.match(/(\d{2,4})\s*[xX×]\s*(\d{2,4})/);
+  return m ? { largura: m[1], comprimento: m[2] } : null;
+}
+
+// ── Quantity extractor in columnar context ───────────────────────────────────
+function extrairQtd(linhaOuBloco){
+  // Padrões: "Quantidade: 500", "Qtd 500", "QND. CHAPA 500", "QUANT 500"
+  const m = linhaOuBloco.match(
+    /(?:quant(?:idade)?|qtd\.?|qnd\.?\s*chapa|qnd\.?)\s*[:\-]?\s*(\d{1,6})/i
+  );
+  return m ? m[1] : "";
+}
+
+// ── Paper type extractor ──────────────────────────────────────────────────────
+function extrairPapel(bloco){
+  const m = bloco.match(
+    /(?:papel[aã]o\s+fornecedor|papelão\s+fornec\.?|modelo\s+papel[aã]o|produto)[:\s]+([^\n]{3,40})/i
+  );
+  if(m) return limTxt(m[1]);
+  // Fallback: código de papel (P25, P50, P60...)
+  const p = bloco.match(/\b(P\d{2}[A-Z]?(?:\s*[-\/]\s*[A-Z0-9]+)?)\b/);
+  return p ? p[1] : "";
+}
+
+// ── Specific Models ───────────────────────────────────────────────────────────
+function extrairModeloAbapel(t){
+  const lista = [];
+  const re = /(?:^|\s)(\d{1,3})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})\s+(P\d{2}[A-Z]?)/gi;
+  let m;
+  while((m = re.exec(t)) !== null){
+    lista.push({
+      of: ocProximo(t, m.index),
+      quantidade: limNum(m[2]),
+      largura: m[3],
+      comprimento: m[4],
+      papel: m[5],
+      vinco: vincoProximo(t, m.index)
     });
-
-    return limparDuplicados(pedidos);
+  }
+  return lista;
 }
 
-function extrairModeloAbapel(texto){
-    const pedidos = [];
-
-    const regex = /(?:^|\s)(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+(\d{2,4})\s*[xX]\s*(\d{2,4})\s+(P\d{2}[A-Z]?|P\d{2})/gi;
-
-    let m;
-    while((m = regex.exec(texto)) !== null){
-        pedidos.push({
-            of: procurarOFProximo(texto, m.index),
-            quantidade: limparNumero(m[2]),
-            largura: limparNumero(m[3]),
-            comprimento: limparNumero(m[4]),
-            papel: m[5],
-            vinco: procurarVincoProximo(texto, m.index)
-        });
-    }
-
-    return pedidos;
-}
-
-function extrairModeloFavinco(texto){
-    const pedidos = [];
-
-    const regex = /(\d{2,6})\s+chap\w*\s+(P\d{2}[-\s]?[A-Z]?)\s+onda\s+([A-Z]{1,2})\s+([\d.]+)\s*[xX]\s*([\d.]+)(?:\s+vinco\s+([\dxX]+))?(?:\s*\([^)]*?(\d+)\))?/gi;
-
-    let m;
-    while((m = regex.exec(texto)) !== null){
-        pedidos.push({
-            of: "",
-            quantidade: limparNumero(m[1]),
-            largura: limparNumero(m[4]),
-            comprimento: limparNumero(m[5]),
-            papel: limparTexto(m[2]),
-            onda: limparTexto(m[3]),
-            gramatura: "",
-            vinco: m[6] ? limparTexto(m[6]) : "",
-            ino: m[7] || ""
-        });
-    }
-
-    return pedidos;
-}
-
-function extrairModeloChapaLinha(texto){
-    const pedidos = [];
-
-    const regex = /Chapa\s+\d+\s*-\s*(\d{2,4})\s*[xX]\s*(\d{2,4})(.*?)(?=Chapa\s+\d+\s*-|$)/gi;
-
-    let m;
-    while((m = regex.exec(texto)) !== null){
-        const bloco = m[3];
-
-        const qtd = (bloco.match(/Quantidade[:\s]+(\d{1,6})/i) || [])[1] || "";
-        const papel = (bloco.match(/Modelo\s+Papel[aã]o[:\s]+([A-Z0-9\s-]+)/i) || [])[1] || "";
-        const onda = (bloco.match(/Tipo\s+de\s+Onda[:\s]+([A-Z]{1,2})/i) || [])[1] || "";
-        const vinco = (bloco.match(/vincos?\s+([\d\s*xX]+)/i) || [])[1] || "";
-
-        pedidos.push({
-            of: "",
-            quantidade: qtd,
-            largura: limparNumero(m[1]),
-            comprimento: limparNumero(m[2]),
-            papel: limparTexto(papel),
-            onda: limparTexto(onda),
-            vinco: limparTexto(vinco)
-        });
-    }
-
-    return pedidos;
-}
-
-function extrairModeloPCBOX(texto){
-    const pedidos = [];
-
-    const numeroPedido = (texto.match(/N[úu]mero\.?:?\s*([\d.,]+)/i) || [])[1] || "";
-
-    const regex = /(\d{1,2})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+([\d.]+)\s*[xX]\s*([\d.]+)\s+(.+?)(?=\s+\d+[.,]\d{3}\b|\s+Gr\.|\s+Vincos|\s+OF[:\s]|$)/gi;
-
-    let m;
-    while((m = regex.exec(texto)) !== null){
-        const janela = texto.slice(m.index, m.index + 400);
-
-        const of = (janela.match(/OF[:\s]*\.?\s*(\d{3,8})/i) || [])[1] || "";
-        const vinco = (janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i) || [])[1] || "";
-
-        const papelBruto = limparTexto(m[5]);
-        const og = extrairOndaGramatura(papelBruto);
-        const papelLimpo = papelBruto
-            .replace(/\b[A-Z]{1,2}\s+\d{2,4}\s*[Gg]\b/, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-
-        pedidos.push({
-            of: of || numeroPedido,
-            quantidade: limparNumero(m[2]),
-            largura: limparNumero(m[3]),
-            comprimento: limparNumero(m[4]),
-            papel: papelLimpo,
-            onda: og.onda,
-            gramatura: og.gramatura,
-            vinco: limparTexto(vinco)
-        });
-    }
-
-    return pedidos;
-}
-
-function procurarOFProximo(texto, posicao){
-    const janela = texto.slice(posicao, posicao + 250);
-    const m = janela.match(/OF[:\s]*\.?\s*(\d{4,8})/i);
-    return m ? m[1] : "";
-}
-
-function procurarVincoProximo(texto, posicao){
-    const janela = texto.slice(posicao, posicao + 220);
-    const m = janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i);
-    return m ? limparTexto(m[1]) : "";
-}
-
-function extrairOndaGramatura(papel){
-    const t = limparTexto(papel);
-
-    let onda = (t.match(/\b([A-Z]{1,2})\s+\d{2,4}\s*[Gg]\b/) || [])[1] || "";
-    if(!onda){
-        onda = (t.match(/onda\s+([A-Z]{1,2})\b/i) || [])[1] || "";
-    }
-
-    const gramatura = (t.match(/(\d{2,4})\s*[Gg]\b/) || [])[1] || "";
-
-    return { onda, gramatura };
-}
-
-function mostrarPedidos(pedidos){
-    if(pedidos.length === 0){
-        tabelaPedidos.innerHTML = `
-            <tr>
-                <td colspan="10">Nenhum pedido estruturado encontrado.</td>
-            </tr>
-        `;
-        return;
-    }
-
-    tabelaPedidos.innerHTML = pedidos.map(p => `
-        <tr>
-            <td>${escapeHtml(p.pagina || "")}</td>
-            <td>${escapeHtml(p.of || "")}</td>
-            <td>${escapeHtml(p.quantidade || "")}</td>
-            <td>${escapeHtml(p.largura || "")}</td>
-            <td>${escapeHtml(p.comprimento || "")}</td>
-            <td>${escapeHtml(p.papel || "")}</td>
-            <td>${escapeHtml(p.onda || "")}</td>
-            <td>${escapeHtml(p.gramatura || "")}</td>
-            <td>${escapeHtml(p.vinco || "")}</td>
-            <td>${escapeHtml(p.ino || "")}</td>
-        </tr>
-    `).join("");
-}
-
-function limparDuplicados(pedidos){
-    const mapa = new Map();
-
-    pedidos.forEach(p => {
-        const chave = [
-            p.of,
-            p.quantidade,
-            p.largura,
-            p.comprimento,
-            p.papel,
-            p.vinco,
-            p.ino || ""
-        ].join("|");
-
-        if(!mapa.has(chave)){
-            mapa.set(chave, p);
-        }
+function extrairModeloFavinco(t){
+  const lista = [];
+  const re = /(\d{2,6})\s+chap\w*\s+(P\d{2}[-\s]?[A-Z]?)\s+onda\s+([A-Z]{1,2})\s+([\d.]+)\s*[xX]\s*([\d.]+)(?:\s+vinco\s+([\dxX]+))?(?:\s*\([^)]*?(\d+)\))?/gi;
+  let m;
+  while((m = re.exec(t)) !== null){
+    lista.push({
+      of:"",
+      quantidade: limNum(m[1]),
+      largura: limNum(m[4]),
+      comprimento: limNum(m[5]),
+      papel: limTxt(m[2]),
+      onda: limTxt(m[3]),
+      gramatura:"",
+      vinco: m[6] ? limTxt(m[6]) : "",
+      ino: m[7] || ""
     });
-
-    return [...mapa.values()];
+  }
+  return lista;
 }
 
-function limparNumero(valor){
-    if(!valor) return "";
-    return String(valor).replace(/[^\d]/g, "");
+function extrairModeloChapaLinha(t){
+  const lista = [];
+  const re = /Chapa\s+\d+\s*[-–]\s*(\d{2,4})\s*[xX]\s*(\d{2,4})(.*?)(?=Chapa\s+\d+\s*[-–]|$)/gis;
+  let m;
+  while((m = re.exec(t)) !== null){
+    const bloco = m[3];
+    lista.push({
+      of: extrairOC(bloco) || extrairOC(t),
+      quantidade: extrairQtd(bloco),
+      largura: m[1],
+      comprimento: m[2],
+      papel: extrairPapel(bloco),
+      onda: limTxt((bloco.match(/(?:tipo\s+de\s+)?onda[:\s]+([A-Z]{1,2})/i)||[])[1]||""),
+      gramatura:"",
+      vinco: limTxt((bloco.match(/vincos?\s+([\d\s*xX]+)/i)||[])[1]||"")
+    });
+  }
+  return lista;
 }
 
-function limparTexto(valor){
-    if(!valor) return "";
-    return String(valor).replace(/\s+/g, " ").trim();
+function extrairModeloPCBOX(t){
+  const lista = [];
+  const oc = extrairOC(t);
+  const re = /(\d{1,3})\s+\d{2}\/\d{2}\/\d{4}\s+Chapa\s+([\d.,]+)\s+([\d.]+)\s*[xX]\s*([\d.]+)\s+(.+?)(?=\s+\d+[.,]\d{3}\b|\s+Gr\.|\s+Vincos|\s+OF[:\s]|$)/gi;
+  let m;
+  while((m = re.exec(t)) !== null){
+    const janela = t.slice(m.index, m.index + 400);
+    const of = (janela.match(/(?:OF|OC)\s*:?\.?\s*(\d{3,8})/i)||[])[1] || oc;
+    const vinco = (janela.match(/Vincos?[:\s]*([\d\s*xX]+)/i)||[])[1]||"";
+    const papelBruto = limTxt(m[5]);
+    const og = parseOndaGramatura(papelBruto);
+    const papelLimpo = papelBruto.replace(/\b[A-Z]{1,2}\s+\d{2,4}\s*[Gg]\b/,"").replace(/\s+/g," ").trim();
+    lista.push({
+      of, quantidade: limNum(m[2]),
+      largura: limNum(m[3]), comprimento: limNum(m[4]),
+      papel: papelLimpo, onda: og.onda, gramatura: og.gramatura,
+      vinco: limTxt(vinco)
+    });
+  }
+  return lista;
 }
 
-function escapeHtml(texto){
-    return String(texto)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+// Modelo genérico: detecta cabeçalho com coluna de quantidade e dimensões
+function extrairModeloGenerico(t){
+  const lista = [];
+  const oc = extrairOC(t);
+  if(!oc) return lista;
+
+  const linhas = t.split(/\n/).map(l=>l.trim()).filter(Boolean);
+
+  // Procura linha de cabeçalho de tabela
+  let hdrIdx = -1;
+  for(let i=0; i<linhas.length; i++){
+    const lo = linhas[i].toLowerCase();
+    if((lo.includes("quant") || lo.includes("qnd") || lo.includes("qtd")) &&
+       (lo.includes("larg") || lo.includes("comp") || lo.includes("chapa") || lo.includes("dimen"))){
+      hdrIdx = i;
+      break;
+    }
+  }
+  if(hdrIdx < 0) return lista;
+
+  // Lê linhas de dados após o cabeçalho
+  for(let i = hdrIdx+1; i < linhas.length; i++){
+    const ln = linhas[i];
+    if(ln.length < 5) continue;
+    const dim = extrairDim(ln);
+    if(!dim) continue;
+    const qtdM = ln.match(/^\s*(\d{1,6})\b/) || ln.match(/\b(\d{1,4})\s+(?:un|pç|pc|ch)/i);
+    const qtd = qtdM ? qtdM[1] : "";
+    lista.push({
+      of: oc,
+      quantidade: qtd,
+      largura: dim.largura,
+      comprimento: dim.comprimento,
+      papel: extrairPapel(ln),
+      onda:"", gramatura:"", vinco:""
+    });
+  }
+  return lista;
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function ocProximo(t, pos){
+  const j = t.slice(Math.max(0, pos-60), pos+260);
+  const m = j.match(/(?:OF|OC|Pedido|N[úu]mero)[:\s]*\.?\s*([\d.,]+)/i);
+  return m ? limNum(m[1]) : extrairOC(t);
+}
+
+function vincoProximo(t, pos){
+  const j = t.slice(pos, pos+230);
+  const m = j.match(/Vincos?[:\s]*([\d\s*xX]+)/i);
+  return m ? limTxt(m[1]) : "";
+}
+
+function parseOndaGramatura(papel){
+  const t = limTxt(papel);
+  let onda = (t.match(/\b([A-Z]{1,2})\s+\d{2,4}\s*[Gg]\b/)||[])[1]||"";
+  if(!onda) onda = (t.match(/onda\s+([A-Z]{1,2})\b/i)||[])[1]||"";
+  const gramatura = (t.match(/(\d{2,4})\s*[Gg]\b/)||[])[1]||"";
+  return { onda, gramatura };
+}
+
+function limParDuplicados(lista){
+  const mapa = new Map();
+  lista.forEach(p=>{
+    const k=[p.of,p.quantidade,p.largura,p.comprimento,p.papel,p.vinco,p.ino||""].join("|");
+    if(!mapa.has(k)) mapa.set(k,p);
+  });
+  return [...mapa.values()];
+}
+const limparDuplicados = limParDuplicados;
+
+function limNum(v){ return v ? String(v).replace(/[^\d]/g,"") : ""; }
+function limTxt(v){ return v ? String(v).replace(/\s+/g," ").trim() : ""; }
+function escHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Table Rendering ───────────────────────────────────────────────────────────
+const CAMPOS = ["of","quantidade","largura","comprimento","papel","onda","gramatura","vinco","ino"];
+
+function mostrarPedidos(lista){
+  if(!lista.length){
+    tabelaPedidos.innerHTML =
+      `<tr><td colspan="11" style="text-align:center;color:#888;padding:18px">
+        Nenhum pedido encontrado ainda.
+       </td></tr>`;
+    return;
+  }
+
+  tabelaPedidos.innerHTML = lista.map((p,idx)=>`
+    <tr data-idx="${idx}">
+      <td>${escHtml(String(p.pagina||""))}</td>
+      ${CAMPOS.map(c=>`<td contenteditable="true">${escHtml(p[c]||"")}</td>`).join("")}
+      <td><button class="btn-del" onclick="deletarLinha(${idx})">&#10005;</button></td>
+    </tr>
+  `).join("");
+
+  // Sincronizar edições de volta ao modelo
+  tabelaPedidos.querySelectorAll("td[contenteditable]").forEach(td=>{
+    td.addEventListener("blur", ()=>sincronizarLinha(td.closest("tr")));
+  });
+}
+
+function sincronizarLinha(tr){
+  const idx = parseInt(tr.dataset.idx, 10);
+  if(isNaN(idx) || idx >= todosPedidos.length) return;
+  const tds = tr.querySelectorAll("td[contenteditable]");
+  CAMPOS.forEach((c,i)=>{
+    if(tds[i]) todosPedidos[idx][c] = tds[i].textContent.trim();
+  });
+}
+
+function sincronizarTudo(){
+  tabelaPedidos.querySelectorAll("tr[data-idx]").forEach(tr=>sincronizarLinha(tr));
+}
+
+function deletarLinha(idx){
+  todosPedidos.splice(idx,1);
+  mostrarPedidos(todosPedidos);
+  atualizarResumo();
+}
+
+// Adicionar linha em branco manualmente
+btnAddLinha.addEventListener("click", ()=>{
+  todosPedidos.push({
+    pagina: contadorPagina || "—",
+    of:"", quantidade:"", largura:"", comprimento:"",
+    papel:"", onda:"", gramatura:"", vinco:"", ino:""
+  });
+  mostrarPedidos(todosPedidos);
+  atualizarResumo();
+  // Foca na última linha
+  const rows = tabelaPedidos.querySelectorAll("tr");
+  const last = rows[rows.length - 1];
+  if(last){
+    const td = last.querySelector("td[contenteditable]");
+    if(td) td.focus();
+  }
+});
+
+function atualizarResumo(){
+  const n = todosPedidos.length;
+  resumo.textContent = "Folhas: " + contadorPagina + " | Itens: " + n;
+  badgeCount.textContent = n + (n === 1 ? " item" : " itens");
+}
+
+// ── Excel Export ──────────────────────────────────────────────────────────────
+btnExcel.addEventListener("click", ()=>{
+  if(!todosPedidos.length){
+    status.textContent = "Nenhum pedido para exportar.";
+    return;
+  }
+  if(typeof XLSX === "undefined"){
+    status.textContent = "Biblioteca XLSX não carregou. Verifique a internet.";
+    return;
+  }
+
+  sincronizarTudo();
+
+  const dados = todosPedidos.map(p=>({
+    "Pág":      p.pagina || "",
+    "OC/OF":    p.of || "",
+    "Qtd":      p.quantidade ? (Number(p.quantidade) || p.quantidade) : "",
+    "Largura":  p.largura    ? (Number(p.largura)    || p.largura)    : "",
+    "Comprimento": p.comprimento ? (Number(p.comprimento)||p.comprimento) : "",
+    "Papel":    p.papel || "",
+    "Onda":     p.onda || "",
+    "Gramatura":p.gramatura ? (Number(p.gramatura) || p.gramatura) : "",
+    "Vinco":    p.vinco || "",
+    "Ino":      p.ino || ""
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(dados);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+  const now = new Date();
+  const nome = "pedidos_" +
+    now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,"0") +
+    String(now.getDate()).padStart(2,"0") + "_" +
+    String(now.getHours()).padStart(2,"0") +
+    String(now.getMinutes()).padStart(2,"0") + ".xlsx";
+
+  XLSX.writeFile(wb, nome);
+  status.textContent = "Excel gerado: " + nome;
+});
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+btnLimpar.addEventListener("click", ()=>{
+  todosPedidos = [];
+  contadorPagina = 0;
+  tabelaPedidos.innerHTML = "";
+  linhasPedidoDiv.innerHTML = "";
+  resultado.value = "";
+  previewOriginal.src = "";
+  previewProcessada.src = "";
+  previewSection.style.display = "none";
+  status.textContent = "Lista zerada. Aguardando captura...";
+  resumo.textContent = "";
+  badgeCount.textContent = "0 itens";
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+iniciarCamera();
 </script>
 
 </body>
