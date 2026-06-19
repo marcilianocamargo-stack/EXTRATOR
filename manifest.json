@@ -1,11 +1,10 @@
 {
-  "name": "OCR Pedidos Prime",
-  "short_name": "OCR Prime",
-  "description": "Leitura OCR de pedidos de papelão",
-  "start_url": "./",
-  "scope": "./",
+  "name": "Extrator de Pedidos",
+  "short_name": "Extrator",
+  "description": "Captura e extrai dados de pedidos de compra via câmera",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f1e2e",
+  "background_color": "#eef2f7",
   "theme_color": "#1a3a5c",
   "orientation": "portrait",
   "lang": "pt-BR",
@@ -13,12 +12,14 @@
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
