@@ -725,6 +725,7 @@ function extrairPedidos(texto){
   lista = lista.concat(extrairModeloFavinco(t));
   lista = lista.concat(extrairModeloChapaLinha(t));
   lista = lista.concat(extrairModeloGenerico(t));
+  lista = lista.concat(extrairModeloFornecedor(t));
 
   // Complementar onda/gramatura a partir do campo papel
   lista.forEach(p=>{
@@ -905,6 +906,63 @@ function extrairModeloGenerico(t){
       comprimento: dim.comprimento,
       papel: extrairPapel(ln),
       onda:"", gramatura:"", vinco:""
+    });
+  }
+  return lista;
+}
+
+// ── Modelo Fornecedor ─────────────────────────────────────────────────────────
+// Formato: CHAPA [QTD] UND [ONDA] [LARG]x[COMP] ... [VINCO] ... CHAPA P[PAPEL]
+// Ex: "CHAPA 3000" UND B 309x924 comp 94X121X94 ... CHAPA P 40B—"
+//     "CHAPA 1100 UND BB 397x1192 conf 115X167X11 ... CHAPAP 70D"
+function extrairModeloFornecedor(t){
+  const lista = [];
+  const linhas = t.split(/\n/).map(l => l.trim()).filter(l => l.length > 15);
+
+  for(const linha of linhas){
+    // A linha precisa conter "CHAPA" seguido de dígitos (produto)
+    if(!/chapa\s+\d/i.test(linha)) continue;
+
+    // ── Quantidade: primeiro número após "CHAPA" ──────────────────────────
+    const qtdM = linha.match(/chapa\s+(\d+)/i);
+    if(!qtdM) continue;
+
+    // ── Dimensões: primeiro padrão NNNxNNNN da linha ──────────────────────
+    // Word-boundary garante que não captura partes do vinco (NxNxN)
+    const dimM = linha.match(/\b(\d{3,4})[xX](\d{3,4})\b(?![xX\d])/);
+    if(!dimM) continue;
+
+    // ── Onda: letras entre "UND" e as dimensões ───────────────────────────
+    const prefixo = linha.slice(0, linha.indexOf(dimM[0]));
+    const ondaM  = prefixo.match(/UND\s+([A-Za-z]{1,2})/i);
+    let onda = ondaM ? ondaM[1].toUpperCase() : "";
+    // Correções comuns de OCR: "8"→"B", "6"→"B", "0"→"B", "CC"→"C"
+    if(/^[860]$/.test(onda))  onda = "B";
+    if(onda === "CC")          onda = "C";
+
+    // ── Vinco: padrão triplo N×N×N (com X maiúsculo ou minúsculo) ────────
+    const vincoM = linha.match(/\b(\d{2,4}[Xx]\d{2,5}[Xx]\d{2,5}[A-Z]?)\b/);
+    const vinco  = vincoM ? vincoM[1] : "";
+
+    // ── Papel: "CHAPA P NNN[X]" ou "CHAPAP NNN[X]" no final da linha ─────
+    // "CHAPA P 40B—", "CHAPAP 70D", "CHAPAP700", "CHAPA P50C="
+    const papelOcorrencias = [...linha.matchAll(/CHAPA\s*P\s*(\d+\s*[A-Z]{0,4})/gi)];
+    let papel = "";
+    if(papelOcorrencias.length){
+      // Última ocorrência = referência do papel (a primeira é o tipo de produto)
+      const raw = papelOcorrencias[papelOcorrencias.length - 1][1];
+      papel = "P" + raw.replace(/\s+/g,"").replace(/[^A-Z0-9]/gi,"");
+    }
+
+    lista.push({
+      of:         "",
+      quantidade: qtdM[1],
+      largura:    dimM[1],
+      comprimento:dimM[2],
+      onda,
+      gramatura:  "",
+      vinco,
+      papel
     });
   }
   return lista;
