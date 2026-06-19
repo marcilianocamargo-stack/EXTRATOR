@@ -726,6 +726,7 @@ function extrairPedidos(texto){
   lista = lista.concat(extrairModeloChapaLinha(t));
   lista = lista.concat(extrairModeloGenerico(t));
   lista = lista.concat(extrairModeloFornecedor(t));
+  lista = lista.concat(extrairModeloPipe(t));
 
   // Complementar onda/gramatura a partir do campo papel
   lista.forEach(p=>{
@@ -922,6 +923,8 @@ function extrairModeloFornecedor(t){
   for(const linha of linhas){
     // A linha precisa conter "CHAPA" seguido de dígitos (produto)
     if(!/chapa\s+\d/i.test(linha)) continue;
+    // Linhas com separadores pipe são tratadas por extrairModeloPipe
+    if(linha.includes('|')) continue;
 
     // ── Quantidade: primeiro número após "CHAPA" ──────────────────────────
     const qtdM = linha.match(/chapa\s+(\d+)/i);
@@ -961,6 +964,60 @@ function extrairModeloFornecedor(t){
       comprimento:dimM[2],
       onda,
       gramatura:  "",
+      vinco,
+      papel
+    });
+  }
+  return lista;
+}
+
+// ── Modelo Pipe (separador |) ─────────────────────────────────────────────────
+// Formato: CHAPA | QTD | UND | ONDA | LARGxCOMP | VINCO | preços | REFERÊNCIA
+// Ex: "CHAPA | 1000 | UND | B | 350X1260 | X | R$ 0,92 | 3,25% | ... | P25B"
+//     "CHAPA | 700 | UND | 8 |500X1550 X R$1,62 | ... P25B"
+function extrairModeloPipe(t){
+  const lista = [];
+  const oc = extrairOC(t);
+  const linhas = t.split(/\n/).map(l => l.trim()).filter(l => l.length > 10);
+
+  for(const linha of linhas){
+    // Deve conter CHAPA e pelo menos um pipe
+    if(!linha.includes('|')) continue;
+    if(!/chap[ae]?/i.test(linha)) continue;
+
+    // ── Quantidade: dígitos logo após "CHAPA |" ───────────────────────────
+    const qtdM = linha.match(/chap[ae]?\s*\|\s*(\d+)/i);
+    if(!qtdM) continue;
+
+    // ── Onda: letra(s) após "UND" (com ou sem pipe) ───────────────────────
+    const ondaM = linha.match(/und\s*\|?\s*([A-Za-z]{1,2})/i);
+    let onda = ondaM ? ondaM[1].toUpperCase() : '';
+    if(/^[860]$/.test(onda)) onda = 'B';  // OCR: 8/6/0 → B
+    if(onda === 'CC') onda = 'C';
+
+    // ── Dimensões: primeiro padrão NNN[xX]+NNN não seguido de mais xX/dígito
+    // [xX]+ lida com artefatos OCR como "400Xx1380" (duplo x)
+    const dimM = linha.match(/\b(\d{3,4})[xX]+(\d{3,4})\b(?![xX\d])/);
+    if(!dimM) continue;
+
+    // ── Vinco: padrão com 3+ partes numéricas unidas por x/X ─────────────
+    // "197x170x197", "135x140x135x140x40", "85x100x85x100x40"
+    // \b garante início em word boundary (evita capturar do meio de "B5x...")
+    const vincoM = linha.match(/\b(\d{2,4}(?:[xX]\d{2,5}){2,})\b/);
+    const vinco = vincoM ? vincoM[1] : '';
+
+    // ── Papel (REFERÊNCIA): P + dígitos + letras opcionais no fim da linha ─
+    // "P25B", "P258", "P258B", "P 258", "p258"
+    const papelM = linha.match(/\b(P\s*\d+\s*[A-Z]{0,3})\s*[|:\-.~*\s]*$/i);
+    const papel = papelM ? papelM[1].replace(/\s+/g,'').toUpperCase() : '';
+
+    lista.push({
+      of:          oc,
+      quantidade:  qtdM[1],
+      largura:     dimM[1],
+      comprimento: dimM[2],
+      onda,
+      gramatura:   '',
       vinco,
       papel
     });
